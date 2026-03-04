@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trade Bridge — WPP Bot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700;800&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root{--green:#25D366;--green2:#128C7E;--dark:#0a0f0d;--card:#111a16;--border:#1e2e26;--text:#e8f5f0;--muted:#7a9e8e;--accent:#34eb8f;--warn:#f5a623;--danger:#ff5c5c;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--dark);color:var(--text);font-family:'Noto Sans',sans-serif;min-height:100vh;padding:30px 16px;background-image:radial-gradient(ellipse at 10% 20%,rgba(37,211,102,0.07) 0%,transparent 60%),radial-gradient(ellipse at 90% 80%,rgba(18,140,126,0.06) 0%,transparent 60%);}
+    .container{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+    .header{display:flex;align-items:center;gap:14px;}
+    .logo{width:52px;height:52px;background:linear-gradient(135deg,var(--green),var(--green2));border-radius:14px;display:grid;place-items:center;font-size:26px;box-shadow:0 4px 20px rgba(37,211,102,0.3);flex-shrink:0;}
+    .header h1{font-family:'Baloo 2',cursive;font-size:1.8rem;font-weight:800;background:linear-gradient(90deg,var(--green),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .header p{color:var(--muted);font-size:0.83rem;margin-top:2px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;}
+    .card-title{font-family:'Baloo 2',cursive;font-size:1.05rem;font-weight:700;color:var(--accent);margin-bottom:16px;}
+    .field{margin-bottom:14px;}
+    .field:last-child{margin-bottom:0;}
+    label{display:block;font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;}
+    input[type=text]{width:100%;background:#0d1a13;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;padding:11px 14px;outline:none;transition:border-color 0.2s;font-family:'Noto Sans',sans-serif;}
+    input:focus{border-color:var(--green);}
+    input::placeholder{color:#3a5a4a;}
+    .server-row{display:flex;gap:10px;align-items:flex-end;}
+    .server-row>div{flex:1;}
+    .btn-small{padding:11px 16px;background:rgba(37,211,102,0.15);color:var(--green);border:1px solid rgba(37,211,102,0.3);border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+    .btn-small:hover{background:rgba(37,211,102,0.25);}
+
+    /* STATUS */
+    .status-box{padding:14px 18px;border-radius:10px;font-size:0.88rem;font-weight:600;text-align:center;margin-top:12px;display:none;}
+    .status-connected{background:rgba(37,211,102,0.1);color:var(--green);border:1px solid rgba(37,211,102,0.3);}
+    .status-waiting{background:rgba(245,166,35,0.1);color:var(--warn);border:1px solid rgba(245,166,35,0.3);}
+    .status-error{background:rgba(255,92,92,0.1);color:var(--danger);border:1px solid rgba(255,92,92,0.3);}
+
+    /* QR CODE */
+    #qr-section{display:none;}
+    .qr-wrap{text-align:center;padding:20px;}
+    .qr-wrap img{width:220px;height:220px;border-radius:12px;border:3px solid var(--green);padding:8px;background:white;}
+    .qr-wrap p{color:var(--muted);font-size:0.82rem;margin-top:12px;line-height:1.6;}
+
+    /* UPLOAD */
+    .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.25s;position:relative;}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--green);background:rgba(37,211,102,0.04);}
+    .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
+    .upload-icon{font-size:2.4rem;margin-bottom:10px;}
+    .upload-zone h3{font-family:'Baloo 2',cursive;font-size:1rem;margin-bottom:4px;}
+    .upload-zone p{font-size:0.82rem;color:var(--muted);}
+    .file-chosen{margin-top:12px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.3);border-radius:8px;padding:10px 16px;font-size:0.85rem;color:var(--green);display:none;}
+
+    /* TABLE */
+    #preview-section{display:none;}
+    .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
+    table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+    thead{background:#0d1a13;}
+    th{padding:10px 14px;text-align:left;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.07em;white-space:nowrap;}
+    td{padding:10px 14px;border-top:1px solid var(--border);white-space:nowrap;}
+    .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:0.7rem;font-weight:600;}
+    .badge-pending{background:rgba(245,166,35,0.15);color:var(--warn);}
+    .badge-sent{background:rgba(37,211,102,0.15);color:var(--green);}
+    .badge-failed{background:rgba(255,92,92,0.15);color:var(--danger);}
+    .badge-skip{background:rgba(122,158,142,0.15);color:var(--muted);}
+
+    /* SEND BTN */
+    #send-btn{width:100%;padding:17px;background:linear-gradient(135deg,var(--green),var(--green2));border:none;border-radius:14px;color:#fff;font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:800;cursor:pointer;transition:opacity 0.2s,transform 0.15s;box-shadow:0 6px 30px rgba(37,211,102,0.3);}
+    #send-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-2px);}
+    #send-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+
+    /* PROGRESS */
+    #progress-section{display:none;}
+    .prog-bg{background:#0d1a13;border-radius:99px;height:10px;overflow:hidden;margin-bottom:8px;}
+    .prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green2),var(--accent));border-radius:99px;transition:width 0.5s ease;}
+    .prog-label{color:var(--muted);font-size:0.82rem;text-align:center;}
+
+    /* LOG */
+    #log-section{display:none;}
+    .log-box{background:#080e0b;border:1px solid var(--border);border-radius:10px;padding:14px;max-height:200px;overflow-y:auto;font-size:0.78rem;font-family:'Courier New',monospace;line-height:1.7;}
+    .log-ok{color:var(--green);}
+    .log-fail{color:var(--danger);}
+    .log-info{color:var(--muted);}
+
+    /* SUMMARY */
+    #summary{display:none;}
+    .sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+    .sum-box{background:#0d1a13;border-radius:10px;padding:16px;text-align:center;border:1px solid var(--border);}
+    .sum-num{font-family:'Baloo 2',cursive;font-size:2rem;font-weight:800;}
+    .sum-lbl{font-size:0.75rem;color:var(--muted);margin-top:2px;}
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="logo">📦</div>
+    <div>
+      <h1>Trade Bridge</h1>
+      <p>WhatsApp Delivery Bot — WPPConnect</p>
+    </div>
+  </div>
+
+  <!-- SERVER URL -->
+  <div class="card">
+    <div class="card-title">🌐 Railway Server URL</div>
+    <div class="server-row">
+      <div class="field">
+        <label>Server URL</label>
+        <input type="text" id="server-url" placeholder="https://tradebridge-wpp.up.railway.app"/>
+      </div>
+      <button class="btn-small" onclick="checkStatus()">🔍 Check</button>
+    </div>
+    <div class="status-box" id="status-box"></div>
+  </div>
+
+  <!-- QR CODE -->
+  <div class="card" id="qr-section">
+    <div class="card-title">📱 WhatsApp QR Scan Karo</div>
+    <div class="qr-wrap">
+      <img id="qr-img" src="" alt="QR Code"/>
+      <p>Apne phone pe WhatsApp kholо<br/>
+      <strong>Linked Devices → Link a Device</strong><br/>
+      Yeh QR scan karo — ek baar karna hai!</p>
+      <button class="btn-small" style="margin-top:14px" onclick="checkStatus()">🔄 Refresh Status</button>
+    </div>
+  </div>
+
+  <!-- EXCEL UPLOAD -->
+  <div class="card">
+    <div class="card-title">📊 Excel File Upload Karo</div>
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="xlsx-file" accept=".xlsx,.xls"/>
+      <div class="upload-icon">📊</div>
+      <h3>Excel file yahan drop karo ya click karo</h3>
+      <p>Organization, Contact, Product, Quantity, Transport Name, Delivery Date</p>
+    </div>
+    <div class="file-chosen" id="file-chosen">✅ File: <span id="file-name"></span> — <span id="row-count"></span> customers</div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="card" id="preview-section">
+    <div class="card-title">👀 Customers Preview</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Organization</th><th>Contact</th><th>Product</th>
+          <th>Qty</th><th>Transport</th><th>Delivery Date</th><th>Status</th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SEND BTN -->
+  <button id="send-btn" disabled onclick="sendAll()">🚀 WhatsApp Messages Bhejo!</button>
+
+  <!-- PROGRESS -->
+  <div class="card" id="progress-section">
+    <div class="card-title">⏳ Bhej raha hoon...</div>
+    <div class="prog-bg"><div class="prog-fill" id="prog-fill"></div></div>
+    <div class="prog-label" id="prog-label">Tayaar ho raha hoon...</div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card" id="log-section">
+    <div class="card-title">📜 Live Log</div>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="card" id="summary">
+    <div class="card-title">🎉 Kaam Ho Gaya!</div>
+    <div class="sum-grid">
+      <div class="sum-box"><div class="sum-num" id="s-total" style="color:var(--text)">0</div><div class="sum-lbl">Total</div></div>
+      <div class="sum-box"><div class="sum-num" id="s-sent" style="color:var(--green)">0</div><div class="sum-lbl">Bheje Gaye ✅</div></div>
+      <div class="sum-box"><div class="sum-num" id="s-fail" style="color:var(--danger)">0</div><div class="sum-lbl">Failed ❌</div></div>
+    </div>
+  </div>
+
+</div>
+<script>
+let xlsxFile    = null;
+let previewRows = [];
+let serverReady = false;
+
+// ---- CHECK STATUS ----
+async function checkStatus() {
+  const url = document.getElementById('server-url').value.trim();
+  if (!url) { alert('Railway URL daalo pehle!'); return; }
+
+  showStatus('⏳ Check kar raha hoon...', 'waiting');
+
+  try {
+    const res  = await fetch(`${url}/status`);
+    const data = await res.json();
+
+    if (data.ready) {
+      showStatus('✅ WhatsApp Connected! Messages bhej sakte ho!', 'connected');
+      serverReady = true;
+      document.getElementById('qr-section').style.display = 'none';
+      if (xlsxFile) document.getElementById('send-btn').disabled = false;
+    } else if (data.hasQR) {
+      showStatus('📱 QR Code ready hai — scan karo!', 'waiting');
+      serverReady = false;
+      loadQR(url);
+    } else {
+      showStatus('⏳ Server start ho raha hai... 30 second baad check karo', 'waiting');
+      serverReady = false;
+    }
+  } catch(e) {
+    showStatus('❌ Server se connect nahi hua! URL check karo.', 'error');
+    serverReady = false;
+  }
+}
+
+async function loadQR(url) {
+  try {
+    const res  = await fetch(`${url}/qr`);
+    const data = await res.json();
+    if (data.qr) {
+      document.getElementById('qr-img').src = data.qr;
+      document.getElementById('qr-section').style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+function showStatus(msg, type) {
+  const box = document.getElementById('status-box');
+  box.style.display = 'block';
+  box.className = `status-box status-${type}`;
+  box.textContent = msg;
+}
+
+// ---- FILE UPLOAD ----
+const fileInput = document.getElementById('xlsx-file');
+const dropZone  = document.getElementById('drop-zone');
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file) return;
+  xlsxFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    previewRows = data.map(row => ({
+      org:          String(row['Organization']   || ''),
+      contact:      String(row['Contact']        || row['Phone'] || ''),
+      product:      String(row['Product']        || ''),
+      quantity:     String(row['Quantity']       || ''),
+      transport:    String(row['Transport Name'] || ''),
+      deliveryDate: formatDate(row['Delivery Date'] || ''),
+    }));
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('row-count').textContent = previewRows.length;
+    document.getElementById('file-chosen').style.display = 'block';
+    renderTable();
+    if (serverReady) document.getElementById('send-btn').disabled = false;
+    document.getElementById('summary').style.display = 'none';
+    document.getElementById('log-section').style.display = 'none';
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('log-box').innerHTML = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function formatDate(val) {
+  if (!val) return 'N/A';
+  if (val instanceof Date) return val.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  return String(val);
+}
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  previewRows.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    tr.id = `row-${i}`;
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${c.org||'—'}</td>
+      <td>${c.contact||'<span style="color:var(--danger)">❌ Missing</span>'}</td>
+      <td>${c.product||'—'}</td>
+      <td>${c.quantity||'—'}</td>
+      <td>${c.transport||'—'}</td>
+      <td>${c.deliveryDate||'—'}</td>
+      <td><span class="badge badge-pending" id="status-${i}">Pending</span></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('preview-section').style.display = 'block';
+}
+
+function addLog(msg, type='info') {
+  const box = document.getElementById('log-box');
+  const d = document.createElement('div');
+  d.className = `log-${type}`;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+async function sendAll() {
+  const serverUrl = document.getElementById('server-url').value.trim();
+  if (!serverUrl) { alert('⚠️ Railway URL daalo!'); return; }
+  if (!xlsxFile)  { alert('⚠️ Excel file upload karo!'); return; }
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true; btn.textContent = '⏳ Bhej raha hoon...';
+
+  document.getElementById('progress-section').style.display = 'block';
+  document.getElementById('log-section').style.display = 'block';
+  document.getElementById('summary').style.display = 'none';
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('prog-fill').style.width = '10%';
+  document.getElementById('prog-label').textContent = 'Server ko request bhej raha hoon...';
+
+  addLog(`${previewRows.length} customers ko message bhejenge`, 'info');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', xlsxFile);
+    formData.append('countryCode', '91');
+
+    document.getElementById('prog-fill').style.width = '30%';
+    document.getElementById('prog-label').textContent = 'Messages bhej rahe hain... thoda wait karo ⏳';
+    addLog('Server par Excel file bhej di!', 'info');
+
+    const res  = await fetch(`${serverUrl}/send`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Server error!');
+
+    document.getElementById('prog-fill').style.width = '100%';
+    document.getElementById('prog-label').textContent = 'Ho gaya! 🎉';
+
+    data.results.forEach((r, i) => {
+      const badge = document.getElementById(`status-${i}`);
+      if (!badge) return;
+      if (r.status === 'sent')    { badge.textContent = 'Sent ✅';   badge.className = 'badge badge-sent'; }
+      if (r.status === 'failed')  { badge.textContent = 'Failed ❌'; badge.className = 'badge badge-failed'; }
+      if (r.status === 'skipped') { badge.textContent = 'Skip ⚠️';  badge.className = 'badge badge-skip'; }
+    });
+
+    data.results.forEach(r => {
+      if (r.status === 'sent')    addLog(`✅ ${r.name} — Bhej diya!`, 'ok');
+      if (r.status === 'failed')  addLog(`❌ ${r.name} — Error: ${r.error}`, 'fail');
+      if (r.status === 'skipped') addLog(`⚠️  ${r.name} — Skip (${r.reason})`, 'info');
+    });
+
+    const s = data.summary;
+    addLog(`🏁 Complete! Sent: ${s.sent} | Failed: ${s.failed} | Skipped: ${s.skipped}`, 'info');
+
+    document.getElementById('s-total').textContent = s.total;
+    document.getElementById('s-sent').textContent  = s.sent;
+    document.getElementById('s-fail').textContent  = s.failed;
+    document.getElementById('summary').style.display = 'block';
+
+  } catch(err) {
+    addLog(`❌ Error: ${err.message}`, 'fail');
+    document.getElementById('prog-label').textContent = '❌ Error aaya!';
+  }
+
+  btn.disabled = false; btn.textContent = '🚀 WhatsApp Messages Bhejo!';
+}
+</script>
+</body>
+</html>
