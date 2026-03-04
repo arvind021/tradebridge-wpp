@@ -23,19 +23,18 @@ async function initWPP() {
   console.log('🔄 WPPConnect shuru ho raha hai...');
   try {
     wppClient = await create({
-      session:          'tradebridge',
-      catchQR:          (base64Qr) => {
+      session:     'tradebridge',
+      catchQR:     (base64Qr) => {
         qrCodeData = base64Qr;
         isReady    = false;
-        console.log('📱 QR Code ready — dashboard pe jaake scan karo!');
+        console.log('📱 QR Code ready!');
       },
-      statusFind:       (status) => console.log('Status:', status),
-      headless:         true,
-      devtools:         false,
-      useChrome:        false,
-      debug:            false,
-      logQR:            false,
-      browserArgs:      [
+      statusFind:  (status) => console.log('Status:', status),
+      headless:    true,
+      useChrome:   false,
+      debug:       false,
+      logQR:       false,
+      browserArgs: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
@@ -45,54 +44,64 @@ async function initWPP() {
         '--single-process',
         '--disable-gpu'
       ],
-      autoClose:        0,
-      tokenStore:       'file',
+      autoClose:   0,
+      tokenStore:  'file',
     });
-
     isReady    = true;
     qrCodeData = null;
     console.log('✅ WhatsApp connected!');
   } catch(err) {
-    console.error('❌ WPPConnect Error:', err.message);
+    console.error('❌ Error:', err.message);
     setTimeout(initWPP, 5000);
   }
 }
 
+// ---- MESSAGE TEMPLATE ----
+function buildMessage(row) {
+  return `Hello! 👋
+
+We tried reaching you via call and WhatsApp, but couldn't get a response.
+As a result, your order is now marked as delivered.
+
+📦 *Delivery Details:*
+🏢 *Organization:* ${row['Organization']  || 'N/A'}
+🧾 *Invoice ID:*   ${row['Invoice ID']    || 'N/A'}
+🛒 *Product:*      ${row['Product']       || 'N/A'}
+📦 *Quantity:*     ${row['Quantity']      || 'N/A'}
+🚚 *Transport:*    ${row['Transport Name']|| 'N/A'}
+📅 *Delivery Date:*${row['Delivery Date'] || 'N/A'}
+
+Our team will resolve any issues promptly. 🛠️
+
+Thank you for choosing Trade Bridge!`;
+}
+
 // ---- ROUTES ----
+app.get('/', (req, res) => res.json({
+  status: isReady ? '✅ WhatsApp Connected!' : '⏳ Connecting...',
+  ready:  isReady,
+  hasQR:  !!qrCodeData
+}));
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({
-    status:  isReady ? '✅ WhatsApp Connected!' : '⏳ WhatsApp connecting...',
-    ready:   isReady,
-    hasQR:   !!qrCodeData
-  });
-});
-
-// QR Code
 app.get('/qr', (req, res) => {
-  if (isReady) return res.json({ status: 'connected', message: '✅ Already connected!' });
-  if (!qrCodeData) return res.json({ status: 'waiting', message: '⏳ QR generate ho raha hai...' });
+  if (isReady)    return res.json({ status: 'connected', message: '✅ Already connected!' });
+  if (!qrCodeData) return res.json({ status: 'waiting',   message: '⏳ QR generate ho raha hai...' });
   res.json({ status: 'qr', qr: qrCodeData });
 });
 
-// Status
-app.get('/status', (req, res) => {
-  res.json({ ready: isReady, hasQR: !!qrCodeData });
-});
+app.get('/status', (req, res) => res.json({ ready: isReady, hasQR: !!qrCodeData }));
 
-// Send Messages
 app.post('/send', upload.single('file'), async (req, res) => {
-  if (!isReady) return res.status(400).json({ error: '⚠️ WhatsApp connected nahi hai! Pehle QR scan karo.' });
-  if (!req.file) return res.status(400).json({ error: 'Excel file nahi mili!' });
+  if (!isReady)   return res.status(400).json({ error: '⚠️ WhatsApp connected nahi! Pehle QR scan karo.' });
+  if (!req.file)  return res.status(400).json({ error: 'Excel file nahi mili!' });
 
   const cc = req.body.countryCode || '91';
 
   try {
     const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-
     console.log(`📋 ${rows.length} customers mile`);
+
     const results = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -118,7 +127,6 @@ app.post('/send', upload.single('file'), async (req, res) => {
         results.push({ name, phone: full, status: 'failed', error: err.message });
       }
 
-      // Random delay 3-5 seconds (ban se bachne ke liye)
       const delay = Math.floor(Math.random() * 2000) + 3000;
       if (i < rows.length - 1) await sleep(delay);
     }
@@ -135,26 +143,6 @@ app.post('/send', upload.single('file'), async (req, res) => {
   }
 });
 
-// ---- MESSAGE TEMPLATE ----
-function buildMessage(row) {
-  return `Hello! 👋
-
-We tried reaching you via call and WhatsApp, but couldn't get a response.
-As a result, your order is now marked as delivered.
-
-📦 *Delivery Details:*
-🏢 *Organization:* ${row['Organization']||'N/A'}
-🛒 *Product:* ${row['Product']||'N/A'}
-📦 *Quantity:* ${row['Quantity']||'N/A'}
-🚚 *Transport:* ${row['Transport Name']||'N/A'}
-📅 *Delivery Date:* ${row['Delivery Date']||'N/A'}
-
-Our team will resolve any issues promptly. 🛠️
-
-Thank you for choosing Trade Bridge!`;
-}
-
-// ---- START ----
 app.listen(PORT, () => {
   console.log(`🚀 Server chal raha hai port ${PORT} par!`);
   initWPP();
